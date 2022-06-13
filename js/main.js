@@ -156,7 +156,6 @@ document.addEventListener('mousemove', e => {
     if (isSelectionInProgress && isCursorAboveArea(e)) {
         setCarriagePosition(e);
         endSelectionPosition = textareaCarriagePosition;
-        console.log(startSelectionPosition, endSelectionPosition);
 
         isTextSelected = true;
     }
@@ -192,14 +191,11 @@ document.addEventListener('keypress', e => {
 });
 
 document.addEventListener('keydown', e => {
-
-    console.log(e.key)
-
     if (isTextSelected && ['Delete', 'Backspace'].includes(e.key)) {
         deleteSelectedText();
     } else {
         if (e.key == 'Backspace') {
-            textareaText = textareaText.slice(0, textareaCarriagePosition - 1) + textareaText.slice(textareaCarriagePosition, textareaText.length);
+            textareaText = textareaText.slice(0, textareaCarriagePosition - +(textareaCarriagePosition > 0)) + textareaText.slice(textareaCarriagePosition, textareaText.length);
             textareaCarriagePosition -= +(textareaCarriagePosition > 0);
         }
 
@@ -210,29 +206,39 @@ document.addEventListener('keydown', e => {
 
     if (e.key == 'ArrowLeft') {
         textareaCarriagePosition -= +(textareaCarriagePosition > 0);
+        resetSelection();
     }
 
     if (e.key == 'ArrowRight') {
         textareaCarriagePosition += +(textareaCarriagePosition < textareaText.length);
+        resetSelection();
     }
 
     if (e.key == 'Control') {
         ctrlIsDown = true;
     }
 
-    if (e.key == 'c' && ctrlIsDown && isTextSelected) {
-        navigator.clipboard.writeText(textareaText.slice(startSelectionPosition, endSelectionPosition));
+    if ((e.key == 'c' || e.key == 'с') && ctrlIsDown && isTextSelected) {
+        if (startSelectionPosition > endSelectionPosition) {
+            navigator.clipboard.writeText(textareaText.slice(endSelectionPosition, startSelectionPosition));
+        } else {
+            navigator.clipboard.writeText(textareaText.slice(startSelectionPosition, endSelectionPosition));
+        }
     }
 
-    if (e.key == 'x' && ctrlIsDown && isTextSelected) {
+    if ((e.key == 'x' || e.key == 'ч') && ctrlIsDown && isTextSelected) {
         navigator.clipboard.writeText(textareaText.slice(startSelectionPosition, endSelectionPosition));
 
         deleteSelectedText();
     }
 
-    if (e.key == 'v' && ctrlIsDown) {
+    if ((e.key == 'v' || e.key == 'м') && ctrlIsDown) {
         navigator.clipboard.readText().then(clipboardText => {
             textareaText = textareaText.slice(0, textareaCarriagePosition) + clipboardText + textareaText.slice(textareaCarriagePosition, textareaText.length);
+
+            if (textareaText.length > textareaMaxLength) {
+                textareaText = textareaText.slice(0, textareaMaxLength);
+            }
 
             textareaCarriagePosition += clipboardText.length;
         });
