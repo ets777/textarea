@@ -20,10 +20,12 @@ const textareaPaddingBottom = 10;
 const textareaMaxLength = 15;
 let textareaText = '';
 let textareaFocus = false;
-let textareaCarriagePosition = 0;
-const textareaCarriageInterval = 1250;
+let textareaCaretPosition = 0;
+let previousTextareaCaretPosition = 0;
+const textareaCaretInterval = 1000;
 const cycleDuration = 10;
 let totalTime = 0;
+let timeShift = 0;
 let startSelectionPosition = 0;
 let endSelectionPosition = 0;
 let isSelectionInProgress = false;
@@ -46,17 +48,24 @@ function isCursorAboveArea(e) {
         cursorY > textareaY;
 }
 
-function drawCarriage() {
-    const textWidth = context.measureText(textareaText.substring(0, textareaCarriagePosition)).width;
-    if (textareaFocus && totalTime % textareaCarriageInterval > textareaCarriageInterval / 2) {
-        const carriageX = textareaX + textareaPaddingLeft + textWidth;
+function drawCaret() {
+    const textWidth = context.measureText(textareaText.substring(0, textareaCaretPosition)).width;
+
+    if (textareaCaretPosition !== previousTextareaCaretPosition) {
+        timeShift = totalTime % textareaCaretInterval;
+    }
+
+    if (textareaFocus && (totalTime - timeShift) % textareaCaretInterval < textareaCaretInterval / 2) {
+        const caretX = textareaX + textareaPaddingLeft + textWidth;
 
         context.beginPath();
         context.lineWidth = 2;
-        context.moveTo(carriageX, textareaY + 5);
-        context.lineTo(carriageX, textareaY + textareaHeight - 5);
+        context.moveTo(caretX, textareaY + 5);
+        context.lineTo(caretX, textareaY + textareaHeight - 5);
         context.stroke();
     }
+
+    previousTextareaCaretPosition = textareaCaretPosition;
 }
 
 function drawText() {
@@ -97,12 +106,12 @@ function drawSelection() {
     }
 }
 
-function setCarriagePosition(e) {
+function setCaretPosition(e) {
     const cursorX = e.offsetX;
     let textWidth = context.measureText(textareaText).width;
 
     if (cursorX > textWidth + textareaX + textareaPaddingLeft) {
-        textareaCarriagePosition = textareaText.length;
+        textareaCaretPosition = textareaText.length;
         return;
     }
 
@@ -113,15 +122,15 @@ function setCarriagePosition(e) {
             const prevTextWidth = context.measureText(textareaText.substring(0, i - 1)).width;
 
             if (cursorX - (prevTextWidth + textareaX + textareaPaddingLeft) > textWidth + textareaX + textareaPaddingLeft - cursorX) {
-                textareaCarriagePosition = i;
+                textareaCaretPosition = i;
             } else {
-                textareaCarriagePosition = i - 1;
+                textareaCaretPosition = i - 1;
             }
 
             return;
         }
 
-        textareaCarriagePosition = i + 1;
+        textareaCaretPosition = i + 1;
     }
 }
 
@@ -135,10 +144,10 @@ function resetSelection() {
 function deleteSelectedText() {
     if (endSelectionPosition > startSelectionPosition) {
         textareaText = textareaText.slice(0, startSelectionPosition) + textareaText.slice(endSelectionPosition, textareaText.length);
-        textareaCarriagePosition = startSelectionPosition;
+        textareaCaretPosition = startSelectionPosition;
     } else {
         textareaText = textareaText.slice(0, endSelectionPosition) + textareaText.slice(startSelectionPosition, textareaText.length);
-        textareaCarriagePosition = endSelectionPosition;
+        textareaCaretPosition = endSelectionPosition;
     }
 
     resetSelection();
@@ -146,16 +155,16 @@ function deleteSelectedText() {
 
 document.addEventListener('mousedown', e => {
     isSelectionInProgress = isCursorAboveArea(e);
-    setCarriagePosition(e);
-    startSelectionPosition = textareaCarriagePosition;
-    endSelectionPosition = textareaCarriagePosition;
+    setCaretPosition(e);
+    startSelectionPosition = textareaCaretPosition;
+    endSelectionPosition = textareaCaretPosition;
 });
 
 document.addEventListener('mousemove', e => {
     document.body.style.cursor = isCursorAboveArea(e) ? 'text' : 'default';
     if (isSelectionInProgress && isCursorAboveArea(e)) {
-        setCarriagePosition(e);
-        endSelectionPosition = textareaCarriagePosition;
+        setCaretPosition(e);
+        endSelectionPosition = textareaCaretPosition;
 
         isTextSelected = true;
     }
@@ -169,7 +178,7 @@ document.addEventListener('mouseup', e => {
 
 document.addEventListener('click', e => {
     if (textareaFocus) {
-        setCarriagePosition(e);
+        setCaretPosition(e);
     }
 
     if (endSelectionPosition == startSelectionPosition) {
@@ -179,14 +188,14 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keypress', e => {
-    if (textareaFocus && e.key != 'Enter' && (textareaText.length < textareaMaxLength || isTextSelected)) {
+    if (textareaFocus && e.key != 'Enter' && e.key != 'Delete' && (textareaText.length < textareaMaxLength || isTextSelected)) {
 
         if (isTextSelected) {
             deleteSelectedText();
         }
 
-        textareaText = textareaText.slice(0, textareaCarriagePosition) + e.key + textareaText.slice(textareaCarriagePosition, textareaText.length);
-        textareaCarriagePosition++;
+        textareaText = textareaText.slice(0, textareaCaretPosition) + e.key + textareaText.slice(textareaCaretPosition, textareaText.length);
+        textareaCaretPosition++;
     }
 });
 
@@ -195,23 +204,36 @@ document.addEventListener('keydown', e => {
         deleteSelectedText();
     } else {
         if (e.key == 'Backspace') {
-            textareaText = textareaText.slice(0, textareaCarriagePosition - +(textareaCarriagePosition > 0)) + textareaText.slice(textareaCarriagePosition, textareaText.length);
-            textareaCarriagePosition -= +(textareaCarriagePosition > 0);
+            textareaText = textareaText.slice(0, textareaCaretPosition - +(textareaCaretPosition > 0)) + textareaText.slice(textareaCaretPosition, textareaText.length);
+            textareaCaretPosition -= +(textareaCaretPosition > 0);
         }
 
         if (e.key == 'Delete') {
-            textareaText = textareaText.slice(0, textareaCarriagePosition) + textareaText.slice(textareaCarriagePosition + 1, textareaText.length);
+            textareaText = textareaText.slice(0, textareaCaretPosition) + textareaText.slice(textareaCaretPosition + 1, textareaText.length);
         }
     }
 
-    if (e.key == 'ArrowLeft') {
-        textareaCarriagePosition -= +(textareaCarriagePosition > 0);
+    if (e.key == 'ArrowLeft' && !ctrlIsDown) {
+        textareaCaretPosition -= +(textareaCaretPosition > 0);
         resetSelection();
     }
 
-    if (e.key == 'ArrowRight') {
-        textareaCarriagePosition += +(textareaCarriagePosition < textareaText.length);
+    if (e.key == 'ArrowRight' && !ctrlIsDown) {
+        textareaCaretPosition += +(textareaCaretPosition < textareaText.length);
         resetSelection();
+    }
+
+    if (['ArrowLeft', 'ArrowRight'].includes(e.key) && ctrlIsDown) {
+        let wordsPosition = [...textareaText.matchAll(/\s+/g)];
+        wordsPosition = wordsPosition.map(a => a.index + a[0].length);
+
+        if (e.key == 'ArrowLeft') {
+            wordsPosition = wordsPosition.filter(a => a < textareaCaretPosition);
+            textareaCaretPosition = wordsPosition[wordsPosition.length - 1] || 0;
+        } else {
+            wordsPosition = wordsPosition.filter(a => a > textareaCaretPosition);
+            textareaCaretPosition = wordsPosition[0] || textareaText.length;
+        }
     }
 
     if (e.key == 'Control') {
@@ -234,14 +256,25 @@ document.addEventListener('keydown', e => {
 
     if ((e.key == 'v' || e.key == 'м') && ctrlIsDown) {
         navigator.clipboard.readText().then(clipboardText => {
-            textareaText = textareaText.slice(0, textareaCarriagePosition) + clipboardText + textareaText.slice(textareaCarriagePosition, textareaText.length);
+            if (clipboardText.length > 0) {
+                deleteSelectedText();
 
-            if (textareaText.length > textareaMaxLength) {
-                textareaText = textareaText.slice(0, textareaMaxLength);
+                textareaText = textareaText.slice(0, textareaCaretPosition) + clipboardText + textareaText.slice(textareaCaretPosition, textareaText.length);
+
+                if (textareaText.length > textareaMaxLength) {
+                    textareaText = textareaText.slice(0, textareaMaxLength);
+                }
+
+                textareaCaretPosition += clipboardText.length;
             }
-
-            textareaCarriagePosition += clipboardText.length;
         });
+    }
+
+    if ((e.key == 'a' || e.key == 'ф') && ctrlIsDown) {
+        isTextSelected = true;
+        startSelectionPosition = 0;
+        endSelectionPosition = textareaText.length;
+        textareaCaretPosition = textareaText.length;
     }
 });
 
@@ -256,7 +289,7 @@ function textareaCycle() {
     app.clearBoard();
     drawBorder();
     drawSelection();
-    drawCarriage();
+    drawCaret();
     drawOutputText();
     drawLabelText();
     drawText();
